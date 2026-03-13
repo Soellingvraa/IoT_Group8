@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, jsonify
 from sense_hat import SenseHat
 
 app = Flask(__name__)
@@ -28,16 +28,40 @@ dashboard_template = """
     <div class="card"><div>Temperature</div><div class="value">{{ temp }}<span class="unit">°C</span></div></div>
     <div class="card"><div>Humidity</div><div class="value">{{ humidity }}<span class="unit">%</span></div></div>
     <div class="card"><div>Pressure</div><div class="value">{{ pressure }}<span class="unit">hPa</span></div></div>
+    
+    <script>
+    let intervalSeconds = 10; // You can change this to any number
+
+    function updateDashboard() {
+        fetch('/api/data')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('temp').innerText = data.temp;
+                document.getElementById('humidity').innerText = data.humidity;
+                document.getElementById('pressure').innerText = data.pressure;
+            });
+    }
+
+    // Run the update every X seconds
+    setInterval(updateDashboard, intervalSeconds * 1000);
+</script>
 </body>
 </html>
 """
-
 @app.route('/')
 def index():
+    # Initial load of the page
     t = round(sense.get_temperature(), 1)
     h = round(sense.get_humidity(), 1)
     p = round(sense.get_pressure(), 1)
     return render_template_string(dashboard_template, temp=t, humidity=h, pressure=p)
+
+@app.route('/api/data')
+def getdata():
+    t = round(sense.get_temperature(), 1)
+    h = round(sense.get_humidity(), 1)
+    p = round(sense.get_pressure(), 1)
+    return jsonify( temp=t, humidity=h, pressure=p)
 
 if __name__ == '__main__':
     # Use port 5000 so we don't always need 'sudo'
