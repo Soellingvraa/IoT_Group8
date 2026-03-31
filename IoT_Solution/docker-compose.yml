@@ -1,0 +1,101 @@
+services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS @JESPER
+  influxdb:
+    container_name: influxdb-server
+    image: influxdb:latest
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: Nimbus
+      DOCKER_INFLUXDB_INIT_PASSWORD: NimbusWeather26
+      DOCKER_INFLUXDB_INIT_ORG: Nimbus
+      DOCKER_INFLUXDB_INIT_BUCKET: Nimbus
+      
+    volumes:
+      - db-data:/var/lib/influxdb:rw
+    ports:
+      - 8086:8086
+  rabbitmq:
+    container_name: rabbitmq-server
+    image: rabbitmq:3.12-management
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: Nimbus
+      RABBITMQ_DEFAULT_PASS: NimbusWeather26
+    ports:
+      - 5672:5672
+      - 15672:15672
+      - 1883:1883
+    command: >
+      sh -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_federation_management rabbitmq_stomp &&
+            docker-entrypoint.sh rabbitmq-server"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+#BELOW THIS LINE IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS PROJECT @JESPER
+  mockup:
+    container_name: ur3e_mockup
+    build:
+      context: ./ur3e_mockup
+      dockerfile: ${DOCKERFILE:-Dockerfile.x86}
+    volumes:
+      - ./startup/startup.conf:/app/startup.conf:z
+    restart: unless-stopped
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+  data_recorder:
+    container_name: data_recorder
+    build: 
+      context: .
+      dockerfile: DTsolution/DTservices/data_recorder/Dockerfile
+    volumes:
+      - ./communication/connect.yml:/app/connect.yml:rw
+      - ./DTsolution/DTservices/data_recorder/influxdb.yml:/app/influxdb.yml:rw
+    depends_on:
+      - influxdb
+      - mockup
+  abnormal_movement:
+    container_name: abnormal_movement
+    build: 
+      context: .
+      dockerfile: DTsolution/DTservices/abnormal_movement/Dockerfile
+    volumes:
+      - ./communication/connect.yml:/app/connect.yml:rw
+    depends_on:
+      - mockup
+  stuck_joint:
+    container_name: stuck_joint
+    build: 
+      context: .
+      dockerfile: DTsolution/DTservices/stuck_joint_detection/Dockerfile
+    volumes:
+      - ./communication/connect.yml:/app/connect.yml:rw
+    depends_on:
+      - mockup
+  rt_robot_prediction:
+    container_name: robot_prediction
+    build: 
+      context: .
+      dockerfile: DTsolution/DTservices/RT_robot_prediction/Dockerfile
+    volumes:
+      - ./communication/connect.yml:/app/connect.yml:rw
+    depends_on:
+      - mockup
+  robot_ctrl:
+    container_name: robot_ctrl
+    build: 
+      context: .
+      dockerfile: DTsolution/scripts/Dockerfile
+    volumes:
+      - ./communication/connect.yml:/app/connect.yml:rw
+    depends_on:
+      - mockup
+
+networks:
+  shared-communication:
+
+volumes:
+  db-data:
+  grafana-data:
