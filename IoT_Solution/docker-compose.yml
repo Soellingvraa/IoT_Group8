@@ -33,18 +33,19 @@ services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT T
       timeout: 5s
       retries: 20
       start_period: 15s
-#BELOW THIS LINE IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS PROJECT @JESPER
-  mockup:
-    container_name: ur3e_mockup
+
+  Data_modification:
+    container_name: Nimbus_Data_Modification
     build:
-      context: ./ur3e_mockup
-      dockerfile: ${DOCKERFILE:-Dockerfile.x86}
+      context: ./ur3e_mockup #not changed
+      dockerfile: ${DOCKERFILE:-Dockerfile.x86} #not changed
     volumes:
-      - ./startup/startup.conf:/app/startup.conf:z
-    restart: unless-stopped
+      - ./startup/startup.conf:/app/startup.conf:z #not changed
+    restart: unless-stopped #not changed
     depends_on:
       rabbitmq:
-        condition: service_healthy
+        condition: service_healthy #not changed
+#BELOW THIS LINE IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS PROJECT @JESPER
   data_recorder:
     container_name: data_recorder
     build: 
