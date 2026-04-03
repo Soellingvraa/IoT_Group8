@@ -34,7 +34,7 @@ def mqtt_publish_data():
         print(f"Failed to connect to MQTT broker: {e}")
         return
 
-threading.Thread(mqtt_publish_data, daemon=True).start()
+threading.Thread(target=mqtt_publish_data, daemon=True).start()
 
 
 #HTML dashboard template
