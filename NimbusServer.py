@@ -1,8 +1,40 @@
+#NimbusServer.py
+#running on the raspberry pi, must upload the data pulled from the sense hat
+#to rabbitMQ with a changable frequency
+#the data should also be stored locally in a database for later use and analysis
+import time
+import json
+import threading
+import paho.mqtt.client as mqtt
 from flask import Flask, render_template_string, jsonify
-from sense_hat import SenseHat
 
+from sensors import WeatherSensor  # pulling the WeatherSensor class form sensors.py
 app = Flask(__name__)
-sense = SenseHat()
+data = WeatherSensor()  # Initial data fetch
+
+# MQTT configuration
+MQTT_BROKER = '192.168.32.8'  # Change this to your RabbitMQ broker address (local IP address of RabbitMQ server)
+MQTT_TOPIC = 'nimbus/sensor_data'
+
+#local data storage, this is just a placeholder, you can replace it with a proper database implementation 
+#we should probably move this to a seperate module, but for now it is here for simplicity
+current_data = {"temperature": None, "humidity": None, "pressure": None}
+
+def mqtt_publish_data():
+    client = mqtt.Client()
+    client.username_pw_set("Nimbus", "Nimbus")  # Set your MQTT username and password
+    try:
+        client.connect(MQTT_BROKER, 1883, 60)
+        print(f"Connected to MQTT broker at {MQTT_BROKER}")
+        while True:
+            Weather_data = data.get_readings()
+            client.publish(MQTT_TOPIC, json.dumps(Weather_data))
+            time.sleep(10)  # Publish data every 10 seconds
+    except Exception as e:
+        print(f"Failed to connect to MQTT broker: {e}")
+        return
+
+threading.Thread(mqtt_publish_data, daemon=True).start()
 
 
 #HTML dashboard template
@@ -25,9 +57,9 @@ dashboard_template = """
 
 <body>
     <h1>Nimbus Weather Station</h1>
-    <div class="card"><div>Temperature</div><div class="value">{{ temp }}<span class="unit">°C</span></div></div>
-    <div class="card"><div>Humidity</div><div class="value">{{ humidity }}<span class="unit">%</span></div></div>
-    <div class="card"><div>Pressure</div><div class="value">{{ pressure }}<span class="unit">hPa</span></div></div>
+    <div class="card"><div>Temperature</div><div id="temp" class="value">{{ temp }}</div><span class="unit">°C</span></div>
+    <div class="card"><div>Humidity</div><div id="humidity" class="value">{{ humidity }}</div><span class="unit">%</span></div>
+    <div class="card"><div>Pressure</div><div id="pressure" class="value">{{ pressure }}</div><span class="unit">hPa</span></div>
     
     <script>
     let intervalSeconds = 10; // You can change this to any number
@@ -36,7 +68,7 @@ dashboard_template = """
         fetch('/api/data')
             .then(response => response.json())
             .then(data => {
-                document.getElementById('temp').innerText = data.temp;
+                document.getElementById('temp').innerText = data.temperature;
                 document.getElementById('humidity').innerText = data.humidity;
                 document.getElementById('pressure').innerText = data.pressure;
             });
@@ -51,17 +83,16 @@ dashboard_template = """
 @app.route('/')
 def index():
     # Initial load of the page
-    t = round(sense.get_temperature(), 1)
-    h = round(sense.get_humidity(), 1)
-    p = round(sense.get_pressure(), 1)
-    return render_template_string(dashboard_template, temp=t, humidity=h, pressure=p)
+    weather_data = data.get_readings()
+    return render_template_string(dashboard_template,
+                                   temp=weather_data["temperature"],
+                                    humidity=weather_data["humidity"],
+                                    pressure=weather_data["pressure"])
 
 @app.route('/api/data')
 def getdata():
-    t = round(sense.get_temperature(), 1)
-    h = round(sense.get_humidity(), 1)
-    p = round(sense.get_pressure(), 1)
-    return jsonify( temp=t, humidity=h, pressure=p)
+    weather_data = data.get_readings()
+    return jsonify(weather_data)
 
 if __name__ == '__main__':
     # Use port 5000 so we don't always need 'sudo'

@@ -1,32 +1,34 @@
+#docker-compose.yml
+#This file is used to define and run multi-container Docker applications. 
+#It allows you to configure your application's services, networks, 
+#and volumes in a single file, making it easier to manage and deploy your application.
 services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS @JESPER
   influxdb:
-    container_name: influxdb-server
+    container_name: influxdb-Nimbus-Server
     image: influxdb:latest
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: Nimbus
       DOCKER_INFLUXDB_INIT_PASSWORD: NimbusWeather26
       DOCKER_INFLUXDB_INIT_ORG: Nimbus
-      DOCKER_INFLUXDB_INIT_BUCKET: Nimbus
-      
+      DOCKER_INFLUXDB_INIT_BUCKET: Nimbus 
     volumes:
-      - db-data:/var/lib/influxdb:rw
+      - db-data:/var/lib/influxdb
     ports:
       - 8086:8086
   rabbitmq:
-    container_name: rabbitmq-server
+    container_name: rabbitmq-Nimbus-Server
     image: rabbitmq:3.12-management
     restart: always
     environment:
       RABBITMQ_DEFAULT_USER: Nimbus
-      RABBITMQ_DEFAULT_PASS: NimbusWeather26
+      RABBITMQ_DEFAULT_PASS: Nimbus
     ports:
       - 5672:5672
       - 15672:15672
       - 1883:1883
     command: >
-      sh -c "rabbitmq-plugins enable --offline rabbitmq_mqtt rabbitmq_federation_management rabbitmq_stomp &&
-            docker-entrypoint.sh rabbitmq-server"
+      sh -c "rabbitmq-plugins enable --offline rabbitmq_mqtt && rabbitmq-server"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -34,69 +36,4 @@ services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT T
       retries: 20
       start_period: 15s
 
-  Data_modification:
-    container_name: Nimbus_Data_Modification
-    build:
-      context: ./ur3e_mockup #not changed
-      dockerfile: ${DOCKERFILE:-Dockerfile.x86} #not changed
-    volumes:
-      - ./startup/startup.conf:/app/startup.conf:z #not changed
-    restart: unless-stopped #not changed
-    depends_on:
-      rabbitmq:
-        condition: service_healthy #not changed
-#BELOW THIS LINE IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS PROJECT @JESPER
-  data_recorder:
-    container_name: data_recorder
-    build: 
-      context: .
-      dockerfile: DTsolution/DTservices/data_recorder/Dockerfile
-    volumes:
-      - ./communication/connect.yml:/app/connect.yml:rw
-      - ./DTsolution/DTservices/data_recorder/influxdb.yml:/app/influxdb.yml:rw
-    depends_on:
-      - influxdb
-      - mockup
-  abnormal_movement:
-    container_name: abnormal_movement
-    build: 
-      context: .
-      dockerfile: DTsolution/DTservices/abnormal_movement/Dockerfile
-    volumes:
-      - ./communication/connect.yml:/app/connect.yml:rw
-    depends_on:
-      - mockup
-  stuck_joint:
-    container_name: stuck_joint
-    build: 
-      context: .
-      dockerfile: DTsolution/DTservices/stuck_joint_detection/Dockerfile
-    volumes:
-      - ./communication/connect.yml:/app/connect.yml:rw
-    depends_on:
-      - mockup
-  rt_robot_prediction:
-    container_name: robot_prediction
-    build: 
-      context: .
-      dockerfile: DTsolution/DTservices/RT_robot_prediction/Dockerfile
-    volumes:
-      - ./communication/connect.yml:/app/connect.yml:rw
-    depends_on:
-      - mockup
-  robot_ctrl:
-    container_name: robot_ctrl
-    build: 
-      context: .
-      dockerfile: DTsolution/scripts/Dockerfile
-    volumes:
-      - ./communication/connect.yml:/app/connect.yml:rw
-    depends_on:
-      - mockup
-
-networks:
-  shared-communication:
-
-volumes:
-  db-data:
-  grafana-data:
+ 
