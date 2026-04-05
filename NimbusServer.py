@@ -7,7 +7,8 @@ import json
 import threading
 import paho.mqtt.client as mqtt
 from flask import Flask, render_template_string, jsonify
-
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
 from sensors import WeatherSensor  # pulling the WeatherSensor class form sensors.py
 app = Flask(__name__)
 data = WeatherSensor()  # Initial data fetch
@@ -15,6 +16,14 @@ data = WeatherSensor()  # Initial data fetch
 # MQTT configuration
 MQTT_BROKER = '192.168.32.8'  # Change this to your RabbitMQ broker address (local IP address of RabbitMQ server)
 MQTT_TOPIC = 'nimbus/sensor_data'
+
+#influxDB config
+MQTT_Broker = '192.168.32.8' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
+MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
+InfluxURL = 'http://192.168.32.8:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
+InfluxToken = 'IQAMaZqXSE6fZBPZTqfGKpiPGo1jJZJ6yZVov0i0YYdKa5oGjYvKEOpyCVHcZ9NPWQVRBmouATpRvWz5CR_bDQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
+InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
+InfluxBucket = 'Nimbus' 
 
 #local data storage, this is just a placeholder, you can replace it with a proper database implementation 
 #we should probably move this to a seperate module, but for now it is here for simplicity
@@ -24,17 +33,35 @@ def mqtt_publish_data():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.username_pw_set("Nimbus", "Nimbus")  # Set your MQTT username and password
     try:
-        client.connect(192.168.32.8, 1883, 60)
+        client.connect(MQTT_BROKER, 1883, 60)
         print(f"Connected to MQTT broker at {MQTT_BROKER}")
         while True:
             Weather_data = data.get_readings()
+            t = Weather_data['temperature']
+            h = Weather_data['humidity']
+            p = Weather_data['pressure']
             client.publish(MQTT_TOPIC, json.dumps(Weather_data))
             time.sleep(10)  # Publish data every 10 seconds
+            try: 
+                point = Point("IoT Sensor Data raw")\
+                    .tag("Nimbus", "Raw Values")\
+                    .field("Temperature", t)\
+                    .field("Humidity", h)\
+                    .field("Pressure", p)\
+                    .time(time.time_ns(), WritePrecision.NS)
+                influx_client = InfluxDBClient(url=InfluxURL, token=InfluxToken, org=InfluxOrg)
+                write_api = influx_client.write_api(write_options=SYNCHRONOUS)
+                write_api.write(bucket=InfluxBucket, org=InfluxOrg, record=point)
+                print(f"logged raw data to InfluxDB: {point.to_line_protocol()}")
+            except Exception as e:
+                print(f"InfluxDB Error: {e}")
+            time.sleep(10) #publish delay 
     except Exception as e:
         print(f"Failed to connect to MQTT broker: {e}")
         return
 
 threading.Thread(target=mqtt_publish_data, daemon=True).start()
+
 
 def on_connect(client, userdata, flags, rc, properties=None): #only for debugging to see if it actually connects to the broker, not used for anything else 
     # code 1 = incorrect protocol version, code 2 = invalid client identifier, code 3 = server unavailable, code 4 = bad username or password, code 5 = not authorized
@@ -42,6 +69,8 @@ def on_connect(client, userdata, flags, rc, properties=None): #only for debuggin
         print(" SUCCESS: Connected to PC Broker")
     else:
         print(f" FAILED: Connection refused, error code: {rc}")
+
+
 
 #HTML dashboard template
 dashboard_template = """

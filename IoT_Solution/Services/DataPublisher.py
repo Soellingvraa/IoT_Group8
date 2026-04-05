@@ -13,15 +13,15 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import datetime
 
 #Config
-MQTT_Broker = 'localhost' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
+MQTT_Broker = '192.168.32.8' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
 MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
-InfluxURL = 'http://localhost:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
+InfluxURL = 'http://192.168.32.8:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
 InfluxToken = 'IQAMaZqXSE6fZBPZTqfGKpiPGo1jJZJ6yZVov0i0YYdKa5oGjYvKEOpyCVHcZ9NPWQVRBmouATpRvWz5CR_bDQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxBucket = 'Nimbus' 
 
 
-class DataModification:
+class PublishData:
     def __init__(self, window = 10): #window is the number of data points to consider for the moving average, 
         #it can be changed when creating an instance of the DataModification class
         # Moving average setup    
@@ -38,15 +38,7 @@ class DataModification:
             h = raw_data['humidity']
             p = raw_data['pressure']
 
-            avg_temp = self.calculate_moving_average(t, self.temp_window)
-            avg_humidity = self.calculate_moving_average(h, self.humidity_window)
-            avg_pressure = self.calculate_moving_average(p, self.pressure_window)
-
-
-            self.historical_extremes(t, h, p)
-
-
-            point = Point("IoT_Data_raw")\
+            point = Point("IoT Sensor Data raw")\
                 .tag("Nimbus", "Raw Values")\
                 .field("Temperature", t)\
                 .field("Humidity", h)\
@@ -63,7 +55,7 @@ class DataModification:
     
 #main execution
 if __name__ == "__main__":
-    service = DataModification(window=10)
+    service = PublishData(window=10)
     MQTT_c =  mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     MQTT_c.on_message = service.data_publisher
     MQTT_c.username_pw_set("Nimbus", "Nimbus")
