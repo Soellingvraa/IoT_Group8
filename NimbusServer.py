@@ -21,10 +21,10 @@ MQTT_TOPIC = 'nimbus/sensor_data'
 current_data = {"temperature": None, "humidity": None, "pressure": None}
 
 def mqtt_publish_data():
-    client = mqtt.Client()
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.username_pw_set("Nimbus", "Nimbus")  # Set your MQTT username and password
     try:
-        client.connect(MQTT_BROKER, 1883, 60)
+        client.connect(192.168.32.8, 1883, 60)
         print(f"Connected to MQTT broker at {MQTT_BROKER}")
         while True:
             Weather_data = data.get_readings()
@@ -36,6 +36,12 @@ def mqtt_publish_data():
 
 threading.Thread(target=mqtt_publish_data, daemon=True).start()
 
+def on_connect(client, userdata, flags, rc, properties=None): #only for debugging to see if it actually connects to the broker, not used for anything else 
+    # code 1 = incorrect protocol version, code 2 = invalid client identifier, code 3 = server unavailable, code 4 = bad username or password, code 5 = not authorized
+    if rc == 0:
+        print(" SUCCESS: Connected to PC Broker")
+    else:
+        print(f" FAILED: Connection refused, error code: {rc}")
 
 #HTML dashboard template
 dashboard_template = """

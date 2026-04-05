@@ -112,9 +112,10 @@ class DataModification:
 #main execution
 if __name__ == "__main__":
     service = DataModification(window=10)
-    MQTT_c =  mqtt.Client()
+    MQTT_c =  mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     MQTT_c.on_message = service.on_message
-
+    MQTT_c.username_pw_set("Nimbus", "Nimbus")
+    
     MQTT_c.connect(MQTT_Broker, 1883, 60)
     MQTT_c.subscribe(MQTT_Topic)
 

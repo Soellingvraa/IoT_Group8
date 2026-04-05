@@ -24,6 +24,7 @@ services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT T
     environment:
       RABBITMQ_DEFAULT_USER: Nimbus
       RABBITMQ_DEFAULT_PASS: Nimbus
+      RABBITMQ_ALLOW_REMOTE_LOGON_USER: "true"
     ports:
       - 5672:5672
       - 15672:15672
