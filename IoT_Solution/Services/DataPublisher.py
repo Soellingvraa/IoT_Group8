@@ -25,53 +25,11 @@ class DataModification:
     def __init__(self, window = 10): #window is the number of data points to consider for the moving average, 
         #it can be changed when creating an instance of the DataModification class
         # Moving average setup    
-        self.temp_window = deque(maxlen=window)
-        self.humidity_window = deque(maxlen=window)
-        self.pressure_window = deque(maxlen=window)
-
-        self.max_temp, self.min_temp = float ('-inf'), float ('inf')
-        self.max_humidity, self.min_humidity = float ('-inf'), float ('inf')
-        self.max_pressure, self.min_pressure = float ('-inf'), float ('inf')
-        
-
-        self.already_reset_today = False
-
-        # InfluxDB client setup
+                # InfluxDB client setup
         self.influx_client = InfluxDBClient(url=InfluxURL, token=InfluxToken, org=InfluxOrg)
         self.write_api = self.influx_client.write_api(write_options=SYNCHRONOUS)
 
-    def calculate_moving_average(self, value, window): #takes the last 10 data point and calculates moving average for the three
-        """Calculates the moving average for a given value and window.
-        """
-        window.append(value)
-        return sum(window) / len(window)
-    
-    def historical_extremes(self, t, h, p):
-        """Updates the historical extremes (min and max) based on the new value.
-        """
-        now = datetime.now()
-        if now.hour == 0 and now.minute == 0: #Reset extremes at midnight
-            if not self.already_reset_today:
-                self.max_temp, self.min_temp = float ('-inf'), float ('inf')
-                self.max_humidity, self.min_humidity = float ('-inf'), float ('inf')
-                self.max_pressure, self.min_pressure = float ('-inf'), float ('inf')
-                self.already_reset_today = True
-                print("Midnight: Historic Extremes reset")
-            else:
-                self.already_reset_today = False
-
-        if t > self.max_temp: self.max_temp = t
-        if t < self.min_temp: self.min_temp = t
-
-        if h > self.max_humidity: self.max_humidity = h
-        if h < self.min_humidity: self.min_humidity = h
-
-        if p > self.max_pressure: self.max_pressure = p
-        if p < self.min_pressure: self.min_pressure = p
-
-       
-
-    def on_message(self, client, userdata, msg):
+    def data_publisher(self, client, userdata, msg):
         """ the engine that processes incoming data from rabbitMQ, it is called every time a new message is received on the subscribed topic
         """
         try: 
@@ -88,23 +46,14 @@ class DataModification:
             self.historical_extremes(t, h, p)
 
 
-            point = Point("WeatherData_Modified")\
-                .tag("Nimbus", "NimbusServer")\
-                .field("Average Temperature", avg_temp)\
-                .field("Average Humidity", avg_humidity)\
-                .field("Average Pressure", avg_pressure)\
-                .field("Max Temperature", self.max_temp)\
-                .field("Min Temperature", self.min_temp)\
-                .field("Max Humidity", self.max_humidity)\
-                .field("Min Humidity", self.min_humidity)\
-                .field("Max Pressure", self.max_pressure)\
-                .field("Min Pressure", self.min_pressure)\
-                .field("Raw Temperature", t)\
-                .field("Raw Humidity", h)\
-                .field("Raw Pressure", p)\
+            point = Point("IoT_Data_raw")\
+                .tag("Nimbus", "Raw Values")\
+                .field("Temperature", t)\
+                .field("Humidity", h)\
+                .field("Pressure", p)\
                 .time(time.time_ns(), WritePrecision.NS)
             self.write_api.write(bucket=InfluxBucket, org=InfluxOrg, record=point)
-            print(f"logged modified data to InfluxDB: {point.to_line_protocol()}")
+            print(f"logged raw data to InfluxDB: {point.to_line_protocol()}")
 
         except Exception as e:
             print(f"Error: {e}")
@@ -116,11 +65,11 @@ class DataModification:
 if __name__ == "__main__":
     service = DataModification(window=10)
     MQTT_c =  mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    MQTT_c.on_message = service.on_message
+    MQTT_c.on_message = service.data_publisher
     MQTT_c.username_pw_set("Nimbus", "Nimbus")
 
     MQTT_c.connect(MQTT_Broker, 1883, 60)
     MQTT_c.subscribe(MQTT_Topic)
 
-    print("Data Modification Service is running and listening for data...")
+    print("Publishing Raw data to InfluxDB")
     MQTT_c.loop_forever()    
