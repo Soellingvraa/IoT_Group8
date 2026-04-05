@@ -83,13 +83,11 @@ class DataModification:
             avg_temp = self.calculate_moving_average(t, self.temp_window)
             avg_humidity = self.calculate_moving_average(h, self.humidity_window)
             avg_pressure = self.calculate_moving_average(p, self.pressure_window)
-
-
             self.historical_extremes(t, h, p)
 
 
             point = Point("WeatherData_Modified")\
-                .tag("Nimbus", "Data Analytics)\
+                .tag("Nimbus", "Data Analytics")\
                 .field("Average Temperature", avg_temp)\
                 .field("Average Humidity", avg_humidity)\
                 .field("Average Pressure", avg_pressure)\
@@ -105,7 +103,6 @@ class DataModification:
                 .time(time.time_ns(), WritePrecision.NS)
             self.write_api.write(bucket=InfluxBucket, org=InfluxOrg, record=point)
             print(f"logged modified data to InfluxDB: {point.to_line_protocol()}")
-
         except Exception as e:
             print(f"Error: {e}")
             
