@@ -16,9 +16,9 @@ from datetime import datetime
 MQTT_Broker = 'localhost' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
 MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
 InfluxURL = 'http://localhost:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
-InfluxToken = 'NimbusWeather26'   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
+InfluxToken = 'IQAMaZqXSE6fZBPZTqfGKpiPGo1jJZJ6yZVov0i0YYdKa5oGjYvKEOpyCVHcZ9NPWQVRBmouATpRvWz5CR_bDQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
-InfluxBucket = 'WeatherData Modified' 
+InfluxBucket = 'Nimbus' 
 
 
 class DataModification:

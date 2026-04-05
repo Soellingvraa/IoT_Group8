@@ -4,7 +4,7 @@
 #and volumes in a single file, making it easier to manage and deploy your application.
 services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS @JESPER
   influxdb:
-    container_name: influxdb-Nimbus-Server
+    container_name: g8-influxdb-Nimbus-Server
     image: influxdb:latest
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
@@ -13,11 +13,12 @@ services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT T
       DOCKER_INFLUXDB_INIT_ORG: Nimbus
       DOCKER_INFLUXDB_INIT_BUCKET: Nimbus 
     volumes:
-      - db-data:/var/lib/influxdb
+      - influxdb-data:/var/lib/influxdb2
     ports:
       - 8086:8086
+    restart: unless-stopped
   rabbitmq:
-    container_name: rabbitmq-Nimbus-Server
+    container_name: g8-rabbitmq-Nimbus-Server
     image: rabbitmq:3.12-management
     restart: always
     environment:
@@ -35,5 +36,6 @@ services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT T
       timeout: 5s
       retries: 20
       start_period: 15s
-
+volumes:
+  influxdb-data:
  
