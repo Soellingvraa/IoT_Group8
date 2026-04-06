@@ -86,7 +86,7 @@ class DataModification:
             self.historical_extremes(t, h, p)
 
 
-            point = Point("WeatherData_Modified")\
+            point = Point("WeatherData Modified")\
                 .tag("Nimbus", "Data Analytics")\
                 .field("Average Temperature", avg_temp)\
                 .field("Average Humidity", avg_humidity)\
