@@ -115,6 +115,13 @@ dashboard_template = """
 </body>
 </html>
 """
+
+
+#Flask routes
+#REST APIs
+#rune wanted us to expand a bit on this and maybe implement so that we can change data in the weatherstation via the api 
+#maybe implement one of each: get, post, put, delete
+
 @app.route('/')
 def index():
     # Initial load of the page
