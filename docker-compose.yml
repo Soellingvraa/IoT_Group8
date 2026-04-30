@@ -2,7 +2,7 @@
 #This file is used to define and run multi-container Docker applications. 
 #It allows you to configure your application's services, networks, 
 #and volumes in a single file, making it easier to manage and deploy your application.
-services: #THIS IS NOT WORKING, IT IS FROM ANOTHER PROJECT, I NEED TO ADAPT IT TO THIS @JESPER
+services: 
   influxdb:
     container_name: g8-influxdb-Nimbus-Server
     image: influxdb:latest

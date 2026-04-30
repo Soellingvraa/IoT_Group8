@@ -21,7 +21,7 @@ MQTT_TOPIC = 'nimbus/sensor_data'
 MQTT_Broker = '192.168.32.8' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
 MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
 InfluxURL = 'http://192.168.32.8:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
-InfluxToken = '5Bg4EM46kJM-yq3yZljjvX5UyBICcniJiGMYOrSEDACX499yw0y9IRuiDKGry1mTO2fIZSZPhxMFOIB_z33YMQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
+InfluxToken = 'kmy_o21Qf7LpDf_KBFQjJDd72_Y8n_O9JLhwxSaiaObQdS_RXcp02rw4euOHE9SLhE06I_FEglWhA1vFWAXroA=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxBucket = 'Nimbus' 
 
