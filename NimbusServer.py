@@ -136,6 +136,13 @@ def getdata():
     weather_data = data.get_readings()
     return jsonify(weather_data)
 
+@app.route('/api/data/download')
+def download_data():
+    # This is a simple placeholder for downloading the historical data as csv format
+    # You can implement the actual CSV download logic here
+    
+    return jsonify({"message": "Data downloaded successfully!"})
+
 if __name__ == '__main__':
     # Use port 5000 so we don't always need 'sudo'
     app.run(host='0.0.0.0', port=5000)
