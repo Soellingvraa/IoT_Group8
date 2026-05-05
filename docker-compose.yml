@@ -12,8 +12,9 @@ services:
       DOCKER_INFLUXDB_INIT_PASSWORD: NimbusWeather26
       DOCKER_INFLUXDB_INIT_ORG: Nimbus
       DOCKER_INFLUXDB_INIT_BUCKET: Nimbus 
+      DOCKER_INFLUXDB_INIT_TOKEN: NimbusWeather26
     volumes:
-      - influxdb-data:/var/lib/influxdb2
+      - influxdb-data:/var/lib/influxdb:rw
     ports:
       - 8086:8086
     restart: unless-stopped
