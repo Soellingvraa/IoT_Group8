@@ -6,7 +6,7 @@ import time
 import json
 import threading
 import paho.mqtt.client as mqtt
-from flask import Flask, render_template_string, jsonify
+from flask import Flask, render_template_string, jsonify, request
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from sensors import WeatherSensor  # pulling the WeatherSensor class form sensors.py
@@ -21,7 +21,7 @@ MQTT_TOPIC = 'nimbus/sensor_data'
 MQTT_Broker = '192.168.32.8' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
 MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
 InfluxURL = 'http://192.168.32.8:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
-InfluxToken = 'kmy_o21Qf7LpDf_KBFQjJDd72_Y8n_O9JLhwxSaiaObQdS_RXcp02rw4euOHE9SLhE06I_FEglWhA1vFWAXroA=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
+InfluxToken = 'xYitY0VJ5e5hyCt6uR-fhA2NiCNlxbwl_QAj8_Xj-VIiy5VsRWauLodSQMtLLYr1ANnxXrwNSH_Tz0jBQMpqjQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxBucket = 'Nimbus' 
 
@@ -97,20 +97,41 @@ dashboard_template = """
     <div class="card"><div>Pressure</div><div id="pressure" class="value">{{ pressure }}</div><span class="unit">hPa</span></div>
     
     <script>
-    let intervalSeconds = 10; // You can change this to any number
-
     function updateDashboard() {
-        fetch('/api/data')
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('temp').innerText = data.temperature;
-                document.getElementById('humidity').innerText = data.humidity;
-                document.getElementById('pressure').innerText = data.pressure;
-            });
-    }
+    fetch('/api/data')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('temp').innerText     = data.temperature;
+            document.getElementById('humidity').innerText = data.humidity;
+            document.getElementById('pressure').innerText = data.pressure;
 
-    // Run the update every X seconds
-    setInterval(updateDashboard, intervalSeconds * 1000);
+            const list = document.getElementById('alert-list');
+            list.innerHTML = '';
+
+            if (data.alerts.length === 0) {
+                list.innerHTML = '<p style="color:#aaa;font-size:14px;">No alert rules configured.</p>';
+                return;
+            }
+
+            data.alerts.forEach(alert => {
+                const triggered = alert.triggered;
+                const row = document.createElement('div');
+                row.className = 'alert-row' + (triggered ? ' triggered' : '');
+                row.innerHTML = `
+                    <div>
+                        <span class="dot ${triggered ? 'dot-alert' : 'dot-ok'}"></span>
+                        <strong>${alert.sensor} ${alert.condition} ${alert.threshold}</strong>
+                    </div>
+                    <span class="badge ${triggered ? 'badge-triggered' : 'badge-ok'}">
+                        ${triggered ? 'Triggered' : 'OK'}
+                    </span>`;
+                list.appendChild(row);
+            });
+        });
+}
+
+setInterval(updateDashboard, 10000);
+updateDashboard();
 </script>
 </body>
 </html>
@@ -131,17 +152,40 @@ def index():
                                     humidity=weather_data["humidity"],
                                     pressure=weather_data["pressure"])
 
-@app.route('/api/data')
-def getdata():
-    weather_data = data.get_readings()
-    return jsonify(weather_data)
+@app.route('/api/data', methods=['GET'])
+def get_current():
+    return jsonify(data.get_readings())
 
-@app.route('/api/data/download')
-def download_data():
-    # This is a simple placeholder for downloading the historical data as csv format
-    # You can implement the actual CSV download logic here
-    
-    return jsonify({"message": "Data downloaded successfully!"})
+@app.route('/api/data/history', methods=['GET'])
+def get_history():
+    # Query InfluxDB for the last N readings
+    # e.g. ?limit=100&sensor=temperature
+    limit = request.args.get('limit', 50)
+    return jsonify({"message": f"Last {limit} readings"})
+
+@app.route('/api/alerts', methods=['POST'])
+def create_alert():
+    # Body: {"sensor": "temperature", "threshold": 30, "condition": "above"}
+    body = request.get_json()
+    sensor    = body.get('sensor')
+    threshold = body.get('threshold')
+    condition = body.get('condition')
+    # Store the alert rule somewhere (dict, DB, etc.)
+    return jsonify({"message": f"Alert created for {sensor} {condition} {threshold}"}), 201
+
+@app.route('/api/config', methods=['PUT'])
+def update_config():
+    # Body: {"publish_interval": 30, "temp_offset": -2.5}
+    body = request.get_json()
+    interval   = body.get('publish_interval')
+    temp_offset = body.get('temp_offset')
+    # Apply changes to the running system
+    return jsonify({"message": "Config updated", "publish_interval": interval, "temp_offset": temp_offset})
+
+@app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
+def delete_alert(alert_id):
+    # Remove the alert rule with this ID
+    return jsonify({"message": f"Alert {alert_id} deleted"}), 200
 
 if __name__ == '__main__':
     # Use port 5000 so we don't always need 'sudo'
