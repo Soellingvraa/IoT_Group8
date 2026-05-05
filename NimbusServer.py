@@ -10,8 +10,12 @@ from flask import Flask, render_template_string, jsonify, request
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from sensors import WeatherSensor  # pulling the WeatherSensor class form sensors.py
+
 app = Flask(__name__)
 data = WeatherSensor()  # Initial data fetch
+
+alerts = {}            
+alert_id_counter = 1    
 
 # MQTT configuration
 MQTT_BROKER = '192.168.32.8'  # Change this to your RabbitMQ broker address (local IP address of RabbitMQ server)
@@ -28,6 +32,20 @@ InfluxBucket = 'Nimbus'
 #local data storage, this is just a placeholder, you can replace it with a proper database implementation 
 #we should probably move this to a seperate module, but for now it is here for simplicity
 current_data = {"temperature": None, "humidity": None, "pressure": None}
+
+def check_alerts(readings):
+    for alert in alerts.values():
+        sensor_value = readings[alert['sensor']]
+        threshold    = alert['threshold']
+
+        if alert['condition'] == 'above' and sensor_value > threshold:
+            alert['triggered'] = True
+            print(f"ALERT: {alert['sensor']} is {sensor_value}, above {threshold}")
+        elif alert['condition'] == 'below' and sensor_value < threshold:
+            alert['triggered'] = True
+            print(f"ALERT: {alert['sensor']} is {sensor_value}, below {threshold}")
+        else:
+            alert['triggered'] = False
 
 def mqtt_publish_data():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -155,7 +173,16 @@ def index():
 @app.route('/api/data', methods=['GET'])
 def get_current():
     return jsonify(data.get_readings())
-
+@app.route('/api/data')
+def getdata():
+    weather_data = data.get_readings()
+    check_alerts(weather_data)  # run the checker on every poll
+    return jsonify({
+        "temperature": weather_data["temperature"],
+        "humidity":    weather_data["humidity"],
+        "pressure":    weather_data["pressure"],
+        "alerts":      list(alerts.values())   # include alerts in the response
+    })
 @app.route('/api/data/history', methods=['GET'])
 def get_history():
     # Query InfluxDB for the last N readings
