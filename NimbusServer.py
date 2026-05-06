@@ -13,7 +13,10 @@ from sensors import WeatherSensor  # pulling the WeatherSensor class form sensor
 
 app = Flask(__name__)
 data = WeatherSensor()  # Initial data fetch
-
+config= {
+    "publish_interval": 10,  # publishing delay set via api, default is 10 seconds
+    "temp_offset": 0.0      #initial temperature offset, can be changed via the API
+}
 alerts = {}            
 alert_id_counter = 1    
 
@@ -33,6 +36,41 @@ InfluxBucket = 'Nimbus'
 #we should probably move this to a seperate module, but for now it is here for simplicity
 current_data = {"temperature": None, "humidity": None, "pressure": None}
 
+def on_config_message(client, userdata, msg):
+    global config
+    try:
+        new_config = json.loads(msg.payload.decode('utf-8'))
+        config.update(new_config)
+        print(f"[QoS 2] Config applied: {new_config}")
+    except Exception as e:
+        print(f"Config error: {e}")
+def start_config_listener():
+    config_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    config_client.username_pw_set("Nimbus", "Nimbus")
+    config_client.on_message = on_config_message
+
+    def on_connect(client, userdata, flags, rc, properties=None):
+        if rc == 0:
+            # Subscribe at QoS 2 — must be inside on_connect
+            # so it resubscribes automatically on reconnect
+            client.subscribe('nimbus/config/rpi2', qos=2)
+            print("[QoS 2] Subscribed to config topic ✓")
+
+    def on_subscribe(client, userdata, mid, reason_codes, properties=None):
+        for rc in reason_codes:
+            granted = rc.value if hasattr(rc, 'value') else rc
+            if granted == 2:
+                print("[QoS 2] Config subscription confirmed ✓")
+            else:
+                print(f"WARNING: Broker only granted QoS {granted} for config topic!")
+
+    config_client.on_connect = on_connect
+    config_client.on_subscribe = on_subscribe
+    config_client.connect(MQTT_BROKER, 1883, 60)
+    config_client.loop_forever()
+
+# Start the config listener as a separate daemon thread
+threading.Thread(target=start_config_listener, daemon=True).start()
 def check_alerts(readings):
     for alert in alerts.values():
         sensor_value = readings[alert['sensor']]
@@ -50,15 +88,17 @@ def check_alerts(readings):
 def mqtt_publish_data():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.username_pw_set("Nimbus", "Nimbus")  # Set your MQTT username and password
+    client.connect(MQTT_BROKER, 1883, 60)
     try:
-        client.connect(MQTT_BROKER, 1883, 60)
         print(f"Connected to MQTT broker at {MQTT_BROKER}")
         while True:
             Weather_data = data.get_readings()
+            Weather_data['temperature'] = round(
+            Weather_data['temperature'] + config['temp_offset'], 1
+                )
             t = Weather_data['temperature']
             h = Weather_data['humidity']
             p = Weather_data['pressure']
-            client.publish(MQTT_TOPIC, json.dumps(Weather_data))
             time.sleep(10)  # Publish data every 10 seconds
             try: 
                 point = Point("IoT Sensor Data raw")\
@@ -71,9 +111,11 @@ def mqtt_publish_data():
                 write_api = influx_client.write_api(write_options=SYNCHRONOUS)
                 write_api.write(bucket=InfluxBucket, org=InfluxOrg, record=point)
                 print(f"logged raw data to InfluxDB: {point.to_line_protocol()}")
+                check_alerts(Weather_data)
+                client.publish(MQTT_TOPIC, json.dumps(Weather_data), qos=0)
             except Exception as e:
                 print(f"InfluxDB Error: {e}")
-            time.sleep(10) #publish delay 
+            time.sleep(config['publish_interval']) #publish delay variable
     except Exception as e:
         print(f"Failed to connect to MQTT broker: {e}")
         return
@@ -105,9 +147,20 @@ dashboard_template = """
             h1 {color: #00ff99;}
             .value {font-size: 2.5em; font-weight: bold; color: #00ccff;}
             .unit {font-size 0.5em; color: #aaa;}
+            .alert-row { display: flex; justify-content: space-between; align-items: center;
+            background: #2d2d2d; border-radius: 10px; padding: 12px 16px; margin: 8px 0; }
+            .alert-row.triggered { border: 1px solid #ff4444; background: #3a1a1a; }
+            .badge { padding: 3px 10px; border-radius: 99px; font-size: 12px; font-weight: bold; }
+            .badge-ok { background: #1a3a1a; color: #00ff99; }
+            .badge-triggered { background: #3a1a1a; color: #ff4444; }
+            .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+            .dot-ok { background: #00ff99; }
+            .dot-alert { background: #ff4444; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
     </style>
 </head>
-
+<h2 style="color:#00ff99; margin-top: 40px;">Alert Rules</h2>
+<div id="alert-list" style="max-width: 600px; margin: 0 auto;"></div>
 <body>
     <h1>Nimbus Weather Station</h1>
     <div class="card"><div>Temperature</div><div id="temp" class="value">{{ temp }}</div><span class="unit">°C</span></div>
@@ -173,16 +226,16 @@ def index():
 @app.route('/api/data', methods=['GET'])
 def get_current():
     return jsonify(data.get_readings())
-@app.route('/api/data')
-def getdata():
-    weather_data = data.get_readings()
-    check_alerts(weather_data)  # run the checker on every poll
-    return jsonify({
-        "temperature": weather_data["temperature"],
-        "humidity":    weather_data["humidity"],
-        "pressure":    weather_data["pressure"],
-        "alerts":      list(alerts.values())   # include alerts in the response
-    })
+# @app.route('/api/data')
+# def getdata():
+#     weather_data = data.get_readings()
+#     check_alerts(weather_data)  # run the checker on every poll
+#     return jsonify({
+#         "temperature": weather_data["temperature"],
+#         "humidity":    weather_data["humidity"],
+#         "pressure":    weather_data["pressure"],
+#         "alerts":      list(alerts.values())   # include alerts in the response
+#     })
 @app.route('/api/data/history', methods=['GET'])
 def get_history():
     # Query InfluxDB for the last N readings
@@ -192,26 +245,66 @@ def get_history():
 
 @app.route('/api/alerts', methods=['POST'])
 def create_alert():
-    # Body: {"sensor": "temperature", "threshold": 30, "condition": "above"}
+    global alert_id_counter
     body = request.get_json()
-    sensor    = body.get('sensor')
-    threshold = body.get('threshold')
-    condition = body.get('condition')
-    # Store the alert rule somewhere (dict, DB, etc.)
-    return jsonify({"message": f"Alert created for {sensor} {condition} {threshold}"}), 201
+
+    if not all(k in body for k in ['sensor', 'threshold', 'condition']):
+        return jsonify({"error": "Missing fields"}), 400
+    if body['sensor'] not in ['temperature', 'humidity', 'pressure']:
+        return jsonify({"error": "Invalid sensor"}), 400
+    if body['condition'] not in ['above', 'below']:
+        return jsonify({"error": "condition must be above or below"}), 400
+
+    alert = {
+        "id":        alert_id_counter,
+        "sensor":    body['sensor'],
+        "threshold": body['threshold'],
+        "condition": body['condition'],
+        "triggered": False
+    }
+    alerts[alert_id_counter] = alert
+    alert_id_counter += 1
+    return jsonify(alert), 201
+
+# Persistent client for publishing config commands
+config_publisher = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+config_publisher.username_pw_set("Nimbus", "Nimbus")
+config_publisher.connect(MQTT_BROKER, 1883, 60)
+config_publisher.loop_start()  # non-blocking loop for the publisher
 
 @app.route('/api/config', methods=['PUT'])
 def update_config():
-    # Body: {"publish_interval": 30, "temp_offset": -2.5}
     body = request.get_json()
-    interval   = body.get('publish_interval')
-    temp_offset = body.get('temp_offset')
-    # Apply changes to the running system
-    return jsonify({"message": "Config updated", "publish_interval": interval, "temp_offset": temp_offset})
 
+    # Validate fields
+    allowed = {'publish_interval', 'temp_offset'}
+    if not any(k in body for k in allowed):
+        return jsonify({"error": "No valid config fields provided"}), 400
+
+    # Publish at QoS 2 — exactly once delivery
+    result = config_publisher.publish(
+        'nimbus/config/rpi2',
+        json.dumps(body),
+        qos=2           # <-- QoS 2 here
+    )
+
+    # Wait for the full 4-step QoS 2 handshake to complete
+    result.wait_for_publish()
+
+    if result.rc == mqtt.MQTT_ERR_SUCCESS:
+        return jsonify({
+            "message": "Config command delivered (QoS 2)",
+            "mid": result.mid,
+            "config": body
+        }), 200
+    else:
+        return jsonify({"error": f"Publish failed: {result.rc}"}), 500
+    
 @app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
 def delete_alert(alert_id):
-    # Remove the alert rule with this ID
+    if alert_id not in alerts:
+        return jsonify({"error": "Alert not found"}), 404
+    del alerts[alert_id]
     return jsonify({"message": f"Alert {alert_id} deleted"}), 200
 
 if __name__ == '__main__':

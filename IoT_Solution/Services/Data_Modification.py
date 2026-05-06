@@ -84,8 +84,28 @@ class DataModification:
             avg_humidity = self.calculate_moving_average(h, self.humidity_window)
             avg_pressure = self.calculate_moving_average(p, self.pressure_window)
             self.historical_extremes(t, h, p)
+            processed = {
+            "avg_temperature": round(avg_temp, 2),
+            "avg_humidity":    round(avg_humidity, 2),
+            "avg_pressure":    round(avg_pressure, 2),
+            "max_temp":        self.max_temp,
+            "min_temp":        self.min_temp,
+        }
 
+            # Publish processed data at QoS 1 to a separate topic
+            result = client.publish(
+                'nimbus/processed_data',
+                json.dumps(processed),
+                qos=1           # <-- QoS 1 here
+            )
 
+            # Check if publish was accepted
+            if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                print(f"Processed data queued for delivery (mid={result.mid})")
+            else:
+                print(f"Publish failed: {result.rc}")
+
+            #Write to influxDB
             point = Point("WeatherData Modified")\
                 .tag("Nimbus", "Data Analytics")\
                 .field("Average Temperature", avg_temp)\
@@ -116,6 +136,24 @@ if __name__ == "__main__":
     MQTT_c.on_message = service.on_message
     MQTT_c.username_pw_set("Nimbus", "Nimbus")
 
+    def on_connect(client, userdata, flags, rc, properties=None):
+        if rc == 0:
+            print("Connected to broker")
+            # Subscribe with QoS 1 inside on_connect
+            # This ensures resubscription on reconnect
+            client.subscribe(MQTT_Topic, qos=1)
+        else:
+            print(f"Connection failed: {rc}")
+
+    def on_subscribe(client, userdata, mid, reason_codes, properties=None): #QoS 1 subscription confirmation
+        for rc in reason_codes:
+            granted = rc.value if hasattr(rc, 'value') else rc
+            if granted == 1:
+                print("Subscription confirmed at QoS 1 ✓")
+            else:
+                print(f"WARNING: Broker granted QoS {granted}, expected 1")
+
+    MQTT_c.on_connect = on_connect
     MQTT_c.connect(MQTT_Broker, 1883, 60)
     MQTT_c.subscribe(MQTT_Topic)
 
