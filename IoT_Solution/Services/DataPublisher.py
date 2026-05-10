@@ -13,9 +13,9 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import datetime
 
 #Config
-MQTT_Broker = '192.168.32.8' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
+MQTT_Broker = '192.168.32.6' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
 MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
-InfluxURL = 'http://192.168.32.8:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
+InfluxURL = 'http://192.168.32.6:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
 InfluxToken = 'xYitY0VJ5e5hyCt6uR-fhA2NiCNlxbwl_QAj8_Xj-VIiy5VsRWauLodSQMtLLYr1ANnxXrwNSH_Tz0jBQMpqjQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
 InfluxBucket = 'Nimbus' 

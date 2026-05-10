@@ -157,5 +157,5 @@ if __name__ == "__main__":
     MQTT_c.connect(MQTT_Broker, 1883, 60)
     MQTT_c.subscribe(MQTT_Topic)
 
-    print("Data Modification Service is running and listening for data...")
+    print("Data analytics are running and listening for data...")
     MQTT_c.loop_forever()    
