@@ -12,9 +12,9 @@ class WeatherSensor:
 
     def get_readings(self):
         return {
-            "temperature": round(self.sense.get_temperature(), 1),
-            "humidity": round(self.sense.get_humidity(), 1),
-            "pressure": round(self.sense.get_pressure(), 1)
+            "temperature": float(round(self.sense.get_temperature(), 1)),
+            "humidity":    float(round(self.sense.get_humidity(), 1)),
+            "pressure":    float(round(self.sense.get_pressure(), 1))
         }
 
 
