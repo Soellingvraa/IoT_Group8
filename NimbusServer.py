@@ -211,9 +211,6 @@ updateDashboard();
 
 #Flask routes
 #REST APIs
-#rune wanted us to expand a bit on this and maybe implement so that we can change data in the weatherstation via the api 
-#maybe implement one of each: get, post, put, delete
-
 @app.route('/')
 def index():
     # Initial load of the page
@@ -223,19 +220,19 @@ def index():
                                     humidity=weather_data["humidity"],
                                     pressure=weather_data["pressure"])
 
+# @app.route('/api/data', methods=['GET'])
+# def get_current():
+#     return jsonify(data.get_readings())
 @app.route('/api/data', methods=['GET'])
-def get_current():
-    return jsonify(data.get_readings())
-# @app.route('/api/data')
-# def getdata():
-#     weather_data = data.get_readings()
-#     check_alerts(weather_data)  # run the checker on every poll
-#     return jsonify({
-#         "temperature": weather_data["temperature"],
-#         "humidity":    weather_data["humidity"],
-#         "pressure":    weather_data["pressure"],
-#         "alerts":      list(alerts.values())   # include alerts in the response
-#     })
+def getdata():
+    weather_data = data.get_readings()
+    check_alerts(weather_data)  # run the checker on every poll
+    return jsonify({
+        "temperature": weather_data["temperature"],
+        "humidity":    weather_data["humidity"],
+        "pressure":    weather_data["pressure"],
+        "alerts":      list(alerts.values())   # include alerts in the response
+    })
 @app.route('/api/data/history', methods=['GET'])
 def get_history():
     # Query InfluxDB for the last N readings
@@ -308,5 +305,4 @@ def delete_alert(alert_id):
     return jsonify({"message": f"Alert {alert_id} deleted"}), 200
 
 if __name__ == '__main__':
-    # Use port 5000 so we don't always need 'sudo'
     app.run(host='0.0.0.0', port=5000)
