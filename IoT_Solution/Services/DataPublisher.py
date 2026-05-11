@@ -1,4 +1,4 @@
-#Data_Modification.py
+#DataPublisher.py
 #This module should import data from rabbit mq and
 # modify it before sending it back to the rabbitMQ but
 # it should also be available locally

@@ -85,12 +85,12 @@ class DataModification:
             avg_pressure = self.calculate_moving_average(p, self.pressure_window)
             self.historical_extremes(t, h, p)
             processed = {
-            "avg_temperature": round(avg_temp, 2),
-            "avg_humidity":    round(avg_humidity, 2),
-            "avg_pressure":    round(avg_pressure, 2),
-            "max_temp":        self.max_temp,
-            "min_temp":        self.min_temp,
-        }
+                "avg_temperature": round(avg_temp, 2),
+                "avg_humidity":    round(avg_humidity, 2),
+                "avg_pressure":    round(avg_pressure, 2),
+                "max_temp":        self.max_temp,
+                "min_temp":        self.min_temp,
+            }
 
             # Publish processed data at QoS 1 to a separate topic
             result = client.publish(
@@ -132,30 +132,39 @@ class DataModification:
 #main execution
 if __name__ == "__main__":
     service = DataModification(window=10)
-    MQTT_c =  mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    MQTT_c.on_message = service.on_message
-    MQTT_c.username_pw_set("Nimbus", "Nimbus")
+    MQTT_c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
     def on_connect(client, userdata, flags, rc, properties=None):
         if rc == 0:
-            print("Connected to broker")
-            # Subscribe with QoS 1 inside on_connect
-            # This ensures resubscription on reconnect
-            client.subscribe(MQTT_Topic, qos=1)
+            print("Connected to broker — subscribing now")
+            result = client.subscribe(MQTT_Topic, qos=1)
+            print(f"Subscribe result: {result}")  # should print (0, mid)
         else:
             print(f"Connection failed: {rc}")
 
-    def on_subscribe(client, userdata, mid, reason_codes, properties=None): #QoS 1 subscription confirmation
+    def on_subscribe(client, userdata, mid, reason_codes, properties=None):
         for rc in reason_codes:
             granted = rc.value if hasattr(rc, 'value') else rc
             if granted == 1:
-                print("Subscription confirmed at QoS 1 ✓")
+                print("Subscription confirmed at QoS 1")
             else:
                 print(f"WARNING: Broker granted QoS {granted}, expected 1")
 
-    MQTT_c.on_connect = on_connect
-    MQTT_c.connect(MQTT_Broker, 1883, 60)
-    MQTT_c.subscribe(MQTT_Topic)
+    # ALL callbacks assigned before connect
+    MQTT_c.on_message   = service.on_message
+    MQTT_c.on_connect   = on_connect
+    MQTT_c.on_subscribe = on_subscribe
+    MQTT_c.username_pw_set("Nimbus", "Nimbus")
 
-    print("Data analytics are running and listening for data...")
-    MQTT_c.loop_forever()    
+    # connect last
+    MQTT_c.connect(MQTT_Broker, 1883, 60)
+    MQTT_c.loop_start()  # starts network loop in background thread
+
+    print("Data analytics are running and listening for data")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Stopped by user")
+        MQTT_c.loop_stop()
+        MQTT_c.disconnect()
