@@ -99,9 +99,9 @@ def mqtt_publish_data():
             t = Weather_data['temperature']
             h = Weather_data['humidity']
             p = Weather_data['pressure']
-            time.sleep(10)  # Publish data every 10 seconds
+            #time.sleep(10)  # Publish data every 10 seconds
             try: 
-                point = Point("IoT Sensor Data raw")\
+                point = Point("Nimbus raw data")\
                     .tag("Nimbus", "Raw Values")\
                     .field("Temperature", t)\
                     .field("Humidity", h)\

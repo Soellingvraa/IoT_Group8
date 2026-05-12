@@ -96,7 +96,7 @@ class DataModification:
             result = client.publish(
                 'nimbus/processed_data',
                 json.dumps(processed),
-                qos=1           # <-- QoS 1 here
+                qos=1           
             )
 
             # Check if publish was accepted
@@ -106,7 +106,7 @@ class DataModification:
                 print(f"Publish failed: {result.rc}")
 
             #Write to influxDB
-            point = Point("WeatherData Modified")\
+            point = Point("Analyzed Data")\
                 .tag("Nimbus", "Data Analytics")\
                 .field("Average Temperature", avg_temp)\
                 .field("Average Humidity", avg_humidity)\
