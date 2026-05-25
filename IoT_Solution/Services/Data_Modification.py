@@ -13,18 +13,18 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 from datetime import datetime
 
 #Config
-MQTT_Broker = 'localhost' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
-MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
-InfluxURL = 'http://localhost:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
-InfluxToken = 'xYitY0VJ5e5hyCt6uR-fhA2NiCNlxbwl_QAj8_Xj-VIiy5VsRWauLodSQMtLLYr1ANnxXrwNSH_Tz0jBQMpqjQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
-InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
+MQTT_Broker = 'localhost' 
+MQTT_Topic = 'nimbus/sensor_data' 
+InfluxURL = 'http://localhost:8086' 
+InfluxToken = 'xYitY0VJ5e5hyCt6uR-fhA2NiCNlxbwl_QAj8_Xj-VIiy5VsRWauLodSQMtLLYr1ANnxXrwNSH_Tz0jBQMpqjQ=='   
+InfluxOrg = 'Nimbus'           
 InfluxBucket = 'Nimbus' 
 
 
 class DataModification:
     def __init__(self, window = 10): #window is the number of data points to consider for the moving average, 
         #it can be changed when creating an instance of the DataModification class
-        # Moving average setup    
+ 
         self.temp_window = deque(maxlen=window)
         self.humidity_window = deque(maxlen=window)
         self.pressure_window = deque(maxlen=window)
@@ -32,23 +32,15 @@ class DataModification:
         self.max_temp, self.min_temp = float ('-inf'), float ('inf')
         self.max_humidity, self.min_humidity = float ('-inf'), float ('inf')
         self.max_pressure, self.min_pressure = float ('-inf'), float ('inf')
-        
-
         self.already_reset_today = False
-
-        # InfluxDB client setup
         self.influx_client = InfluxDBClient(url=InfluxURL, token=InfluxToken, org=InfluxOrg)
         self.write_api = self.influx_client.write_api(write_options=SYNCHRONOUS)
 
-    def calculate_moving_average(self, value, window): #takes the last 10 data point and calculates moving average for the three
-        """Calculates the moving average for a given value and window.
-        """
+    def calculate_moving_average(self, value, window): #takes the last (window=n) data points and calculates moving average
         window.append(value)
         return sum(window) / len(window)
     
     def historical_extremes(self, t, h, p):
-        """Updates the historical extremes (min and max) based on the new value.
-        """
         now = datetime.now()
         if now.hour == 0 and now.minute == 0: #Reset extremes at midnight
             if not self.already_reset_today:
@@ -72,8 +64,6 @@ class DataModification:
        
 
     def on_message(self, client, userdata, msg):
-        """ the engine that processes incoming data from rabbitMQ, it is called every time a new message is received on the subscribed topic
-        """
         try: 
             raw_data = json.loads(msg.payload.decode('utf-8'))
             t = raw_data['temperature']
@@ -92,14 +82,11 @@ class DataModification:
                 "min_temp":        self.min_temp,
             }
 
-            # Publish processed data at QoS 1 to a separate topic
             result = client.publish(
                 'nimbus/processed_data',
                 json.dumps(processed),
                 qos=1           
             )
-
-            # Check if publish was accepted
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
                 print(f"Processed data queued for delivery (mid={result.mid})")
             else:
@@ -126,10 +113,6 @@ class DataModification:
         except Exception as e:
             print(f"Error: {e}")
             
-
-
-    
-#main execution
 if __name__ == "__main__":
     service = DataModification(window=10)
     MQTT_c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -150,21 +133,18 @@ if __name__ == "__main__":
             else:
                 print(f"WARNING: Broker granted QoS {granted}, expected 1")
 
-    # ALL callbacks assigned before connect
     MQTT_c.on_message   = service.on_message
     MQTT_c.on_connect   = on_connect
     MQTT_c.on_subscribe = on_subscribe
     MQTT_c.username_pw_set("Nimbus", "Nimbus")
 
-    # connect last
     MQTT_c.connect(MQTT_Broker, 1883, 60)
-    MQTT_c.loop_start()  # starts network loop in background thread
+    MQTT_c.loop_start() 
 
     print("Data analytics are running and listening for data")
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Stopped by user")
         MQTT_c.loop_stop()
         MQTT_c.disconnect()

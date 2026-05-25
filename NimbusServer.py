@@ -1,7 +1,6 @@
 #NimbusServer.py
 #running on the raspberry pi, must upload the data pulled from the sense hat
 #to rabbitMQ with a changable frequency
-#the data should also be stored locally in a database for later use and analysis
 import time
 import json
 import threading
@@ -9,7 +8,7 @@ import paho.mqtt.client as mqtt
 from flask import Flask, render_template_string, jsonify, request
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
-from sensors import WeatherSensor  # pulling the WeatherSensor class form sensors.py
+from sensors import WeatherSensor
 
 app = Flask(__name__)
 data = WeatherSensor()  # Initial data fetch
@@ -25,16 +24,11 @@ MQTT_BROKER = '192.168.32.6'  # Change this to your RabbitMQ broker address (loc
 MQTT_TOPIC = 'nimbus/sensor_data'
 
 #influxDB config
-MQTT_Broker = '192.168.32.6' #If the docker-compose file is set up correctly, this should be the name of the rabbitmq service defined in the docker-compose file
-MQTT_Topic = 'nimbus/sensor_data' #This is the topic that the data will be published to and subscribed from, it should be the same as the one used in the NimbusServer.py file
-InfluxURL = 'http://192.168.32.6:8086' #This is the URL of the InfluxDB instance, if the docker-compose file is set up correctly, this should be the name of the influxdb service defined in the docker-compose file followed by :8086
-InfluxToken = 'xYitY0VJ5e5hyCt6uR-fhA2NiCNlxbwl_QAj8_Xj-VIiy5VsRWauLodSQMtLLYr1ANnxXrwNSH_Tz0jBQMpqjQ=='   #This might not work  #This is the token for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
-InfluxOrg = 'Nimbus'           #This is the organization for the InfluxDB instance, it should be the same as the one defined in the docker-compose file
+InfluxURL = 'http://192.168.32.6:8086' 
+InfluxToken = 'xYitY0VJ5e5hyCt6uR-fhA2NiCNlxbwl_QAj8_Xj-VIiy5VsRWauLodSQMtLLYr1ANnxXrwNSH_Tz0jBQMpqjQ=='   
+InfluxOrg = 'Nimbus'           
 InfluxBucket = 'Nimbus' 
 
-#local data storage, this is just a placeholder, you can replace it with a proper database implementation 
-#we should probably move this to a seperate module, but for now it is here for simplicity
-current_data = {"temperature": None, "humidity": None, "pressure": None}
 
 def on_config_message(client, userdata, msg):
     global config
@@ -51,8 +45,6 @@ def start_config_listener():
 
     def on_connect(client, userdata, flags, rc, properties=None):
         if rc == 0:
-            # Subscribe at QoS 2 — must be inside on_connect
-            # so it resubscribes automatically on reconnect
             client.subscribe('nimbus/config/rpi2', qos=2)
             print("[QoS 2] Subscribed to config topic ✓")
 
@@ -87,7 +79,7 @@ def check_alerts(readings):
 
 def mqtt_publish_data():
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client.username_pw_set("Nimbus", "Nimbus")  # Set your MQTT username and password
+    client.username_pw_set("Nimbus", "Nimbus") 
     client.connect(MQTT_BROKER, 1883, 60)
     try:
         print(f"Connected to MQTT broker at {MQTT_BROKER}")
@@ -99,7 +91,6 @@ def mqtt_publish_data():
             t = Weather_data['temperature']
             h = Weather_data['humidity']
             p = Weather_data['pressure']
-            #time.sleep(10)  # Publish data every 10 seconds
             try: 
                 point = Point("Nimbus raw data")\
                     .tag("Nimbus", "Raw Values")\
@@ -122,13 +113,6 @@ def mqtt_publish_data():
 
 threading.Thread(target=mqtt_publish_data, daemon=True).start()
 
-
-def on_connect(client, userdata, flags, rc, properties=None): #only for debugging to see if it actually connects to the broker, not used for anything else 
-    # code 1 = incorrect protocol version, code 2 = invalid client identifier, code 3 = server unavailable, code 4 = bad username or password, code 5 = not authorized
-    if rc == 0:
-        print(" SUCCESS: Connected to PC Broker")
-    else:
-        print(f" FAILED: Connection refused, error code: {rc}")
 
 
 
@@ -220,9 +204,7 @@ def index():
                                     humidity=weather_data["humidity"],
                                     pressure=weather_data["pressure"])
 
-# @app.route('/api/data', methods=['GET'])
-# def get_current():
-#     return jsonify(data.get_readings())
+
 @app.route('/api/data', methods=['GET'])
 def getdata():
     weather_data = data.get_readings()
@@ -263,29 +245,29 @@ def create_alert():
     alert_id_counter += 1
     return jsonify(alert), 201
 
-# Persistent client for publishing config commands
+
 config_publisher = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 config_publisher.username_pw_set("Nimbus", "Nimbus")
 config_publisher.connect(MQTT_BROKER, 1883, 60)
-config_publisher.loop_start()  # non-blocking loop for the publisher
+config_publisher.loop_start() 
 
 @app.route('/api/config', methods=['PUT'])
 def update_config():
     body = request.get_json()
 
-    # Validate fields
+
     allowed = {'publish_interval', 'temp_offset'}
     if not any(k in body for k in allowed):
         return jsonify({"error": "No valid config fields provided"}), 400
 
-    # Publish at QoS 2 — exactly once delivery
+    # Publish at QoS 2 
     result = config_publisher.publish(
         'nimbus/config/rpi2',
         json.dumps(body),
         qos=2           # <-- QoS 2 here
     )
 
-    # Wait for the full 4-step QoS 2 handshake to complete
+
     result.wait_for_publish()
 
     if result.rc == mqtt.MQTT_ERR_SUCCESS:
